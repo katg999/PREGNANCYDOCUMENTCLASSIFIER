@@ -2,7 +2,7 @@ import os
 import requests
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-HF_API_URL = "https://h5juq0gnjnavay71.us-east-1.aws.endpoints.huggingface.cloud"
+HF_API_URL = os.getenv("MODEL_ENDPOINT")
 DOCUMENT_TYPES = [
     "ultrasound report",
     "blood test results",
