@@ -31,21 +31,34 @@ async def classify_document(text: str) -> dict:
         logger.error("HF_API_TOKEN environment variable is not set")
         raise RuntimeError("HF API token not configured")
         
-    headers = {"Authorization": f"Bearer {token}"}
+    headers = {
+        "Accept": "application/json",
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
     
     try:
         logger.info(f"Sending request to Hugging Face API at {HF_API_URL}")
         logger.info(f"Text length: {len(text)} characters")
         
-        # Use synchronous requests library within async function
-        # This is not ideal but works with the current structure
+        # Limit text size to prevent issues with large documents
+        limited_text = text[:5000] if len(text) > 5000 else text
+        
+        # Format the payload exactly as shown in the example
+        payload = {
+            "inputs": limited_text,
+            "parameters": {
+                "candidate_labels": ", ".join(DOCUMENT_TYPES)
+            }
+        }
+        
+        logger.info(f"Request payload: {payload}")
+        
+        # Use synchronous requests for now
         response = requests.post(
             HF_API_URL,
             headers=headers,
-            json={
-                "inputs": text[:5000],  # Limit text size for API call
-                "parameters": {"candidate_labels": DOCUMENT_TYPES}
-            },
+            json=payload,
             timeout=30  # Increase timeout
         )
         
@@ -54,12 +67,25 @@ async def classify_document(text: str) -> dict:
             response.raise_for_status()
             
         result = response.json()
-        logger.info(f"Successfully received classification: {result['labels'][0]}")
+        logger.info(f"API response: {result}")
         
-        return {
-            "label": result['labels'][0],
-            "confidence": round(result['scores'][0], 4)
-        }
+        # Handle the response according to the API's actual response format
+        # Assuming the response has a similar structure to the example
+        try:
+            # Get the highest scoring label
+            top_label_index = 0
+            if 'scores' in result and len(result['scores']) > 0:
+                top_label_index = result['scores'].index(max(result['scores']))
+                
+            return {
+                "label": result['labels'][top_label_index] if 'labels' in result else DOCUMENT_TYPES[0],
+                "confidence": round(result['scores'][top_label_index], 4) if 'scores' in result else 0.0
+            }
+        except (KeyError, IndexError) as e:
+            logger.error(f"Failed to parse API response: {str(e)}")
+            logger.error(f"Response content: {result}")
+            raise RuntimeError(f"Failed to parse API response: {str(e)}")
+            
     except requests.exceptions.RequestException as e:
         logger.error(f"HF API request failed: {str(e)}")
         raise RuntimeError(f"HF API request failed: {str(e)}")
