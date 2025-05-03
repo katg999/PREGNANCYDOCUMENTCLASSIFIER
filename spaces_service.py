@@ -6,8 +6,8 @@ def get_spaces_client():
     return boto3.client(
         's3',
         endpoint_url=os.getenv('SPACES_ENDPOINT'),
-        aws_access_key_id=os.getenv('DO_SPACES_KEY'),
-        aws_secret_access_key=os.getenv('DO_SPACES_SECRET')
+        aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+        aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY')
     )
 
 async def store_document(content: bytes, patient_id: str, doc_type: str, filename: str) -> str:
