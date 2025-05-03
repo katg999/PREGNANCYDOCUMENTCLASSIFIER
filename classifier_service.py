@@ -2,7 +2,7 @@ import os
 import requests
 import logging
 import time
-from tenacity import retry, stop_after_attempt, wait_exponential, before_log, after_log, retry_if_exception_type
+from tenacity import retry, retry_if, stop_after_attempt, wait_exponential, before_log, after_log, retry_if_exception_type
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -26,12 +26,13 @@ def should_retry_exception(exception):
     return True
 
 @retry(
-    stop=stop_after_attempt(3),
+    stop=stop_after_attempt(2),
     wait=wait_exponential(multiplier=1, min=4, max=10),
     before=before_log(logger, logging.INFO),
     after=after_log(logger, logging.INFO),
-    retry=retry_if_exception_type(requests.exceptions.RequestException) & should_retry_exception
+    retry=retry_if(lambda e: isinstance(e, requests.exceptions.RequestException) and should_retry_exception(e))
 )
+
 async def classify_document(text: str) -> dict:
     """Classify document using Hugging Face API"""
     if not HF_API_URL:
