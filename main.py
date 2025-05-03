@@ -8,6 +8,7 @@ import os
 import logging
 from classifier_service import classify_document
 from spaces_service import store_document
+from tenacity import RetryError
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -48,14 +49,22 @@ async def test_huggingface():
         
         # Try to classify
         logger.info("Testing Hugging Face API connection...")
-        classification = await classify_document(test_text)
-        
-        return {
-            "status": "success",
-            "message": "Connection to Hugging Face API successful",
-            "classification": classification,
-            "model_endpoint": os.getenv("MODEL_ENDPOINT")
-        }
+        try:
+            classification = await classify_document(test_text)
+            return {
+                "status": "success",
+                "message": "Connection to Hugging Face API successful",
+                "classification": classification,
+                "model_endpoint": os.getenv("MODEL_ENDPOINT")
+            }
+        except RetryError as e:
+            # Handle retry error specifically
+            return {
+                "status": "error",
+                "message": "Hugging Face API is currently unavailable after multiple retry attempts",
+                "model_endpoint": os.getenv("MODEL_ENDPOINT"),
+                "error_details": str(e)
+            }
         
     except Exception as e:
         logger.error(f"Hugging Face API test failed: {str(e)}")
@@ -80,10 +89,21 @@ async def classify_endpoint(
         extracted_text = extract_text(io.BytesIO(contents), file.filename)
         
         # 3. Classify
-        classification = await classify_document(extracted_text)
+        try:
+            classification = await classify_document(extracted_text)
+        except RetryError:
+            # If Hugging Face API is unavailable, use a fallback classification
+            logger.warning("Hugging Face API unavailable, using fallback classification")
+            classification = {
+                "label": "unclassified document",  # Fallback label
+                "confidence": 0.0,
+                "status": "fallback_used"
+            }
         
         # 4. Store
-        s3_path = await store_document(contents, patient_id, classification['label'], file.filename)
+        s3_path = await store_document(contents, patient_id, 
+                                      classification.get('label', 'unclassified'), 
+                                      file.filename)
         
         return {
             "patient_id": patient_id,
