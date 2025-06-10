@@ -88,19 +88,9 @@ async def classify_endpoint(
         contents = await file.read()
         extracted_text = extract_text(io.BytesIO(contents), file.filename)
         
-        # === ADD DEBUG LOGGING HERE ===
-        logger.info(f"Extracted text sample: {extracted_text[:500]}...")  # Log first 500 chars
-        logger.info(f"Sending this text to classifier: {extracted_text}")
-        # ==============================
-        
         # 3. Classify
         try:
             classification = await classify_document(extracted_text)
-            
-            # === ADD LOGGING FOR CLASSIFICATION RESULT ===
-            logger.info(f"Raw classification response: {classification}")
-            # ============================================
-            
         except RetryError:
             # If Hugging Face API is unavailable, use a fallback classification
             logger.warning("Hugging Face API unavailable, using fallback classification")
